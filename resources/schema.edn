@@ -1,0 +1,6 @@
+{:enums {}
+ :objects {:Person {:fields {:id {:type ID}
+                             :name {:type (non-null String)}}}}
+ :queries {:person_by_id {:type :Person
+                          :args {:id {:type ID}}
+                          :resolve :query/person-by-id}}}
