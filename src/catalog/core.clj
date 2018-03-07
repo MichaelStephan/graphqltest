@@ -1,43 +1,36 @@
 (ns catalog.core
   (:require 
-    [com.walmartlabs.lacinia.util :refer [attach-resolvers]]
+    [com.walmartlabs.lacinia.pedestal :as pe]
+    [com.walmartlabs.lacinia.util :as lu]
     [com.walmartlabs.lacinia :refer [execute]]
-    [clojure.data.json :as json]
-    [ring.adapter.jetty :as raj]
     [com.walmartlabs.lacinia.schema :as schema]
-    [ring.middleware.reload :as rmr]
-    [ring.middleware.params :as rmp]))
-
-(defonce jetty-server (atom nil))
+    [io.pedestal.http :as http]))
 
 (defn resolver-map []
   {:query/person-by-id (fn [ctx args value]
-                         {:id "abc" :name "abc"})})
+                         (schema/tag-with-type {:id "foo" :name "Bohdan"} :Person))})
+
+(defn streamer-map []
+  {:stream/persons (fn [ctx args source-stream]
+                     (println "called")
+                     (source-stream (schema/tag-with-type {:id "foo" :name "Bohdan"} :Person))
+                     #(source-stream nil))})
 
 (defn catalog-schema []
   (->
     "resources/schema.edn"
     slurp
     read-string
-    (attach-resolvers (resolver-map))
+    (lu/attach-streamers (streamer-map))
+    (lu/attach-resolvers (resolver-map))
     schema/compile))
 
-(defn handler [req]
-  {:status 200
-     :headers {"Content-Type" "application/json"}
-     :body (let [q (get-in req [:query-params "q"])
-                 ret (execute (catalog-schema)  q nil nil)]
-             (json/write-str ret))})
+(def service (pe/service-map (catalog-schema) {:graphiql true :subscriptions true}))
 
-(def app 
-  (-> handler
-      rmp/wrap-params))
+(defonce runnable-service (http/create-server service))
 
-(defn main [& args]
-  (println "Started http server at port 3000")
-  (println "Fire queries like http://localhost:3000/?q={person_by_id%20(id:%2220%22)%20{id%20name}}")  
-  (raj/run-jetty (rmr/wrap-reload #'app) {:port 3000}))
-
-(comment
-  (raj/run-jetty (rmr/wrap-reload #'app) {:port 3000 :join false})
-  (execute (catalog-schema) "{ person_by_id(id:\"abc\") {id}}" nil nil))
+(defn -main
+  "The entry-point for 'lein run'"
+  [& args]
+  (println "\nCreating your server...")
+  (http/start runnable-service))

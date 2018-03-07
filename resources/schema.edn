@@ -3,4 +3,6 @@
                              :name {:type (non-null String)}}}}
  :queries {:person_by_id {:type :Person
                           :args {:id {:type ID}}
-                          :resolve :query/person-by-id}}}
+                          :resolve :query/person-by-id}}
+ :subscriptions {:persons {:type :Person
+                           :stream :stream/persons}}}
